@@ -1,420 +1,623 @@
-import React, { useRef } from 'react';
-import { 
-  MapPin, 
-  Clock, 
-  Phone, 
-  Scissors, 
-  Sparkles, 
-  MessageCircle,
-  ChevronLeft,
-  ChevronRight
-} from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ShoppingBag, X, Plus, Check, Coffee, Trash2, Utensils, ShoppingBag as BagIcon, User } from 'lucide-react';
+
+// ==========================================
+// 1. DEFINICIÓN DE TIPOS E INTERFACES
+// ==========================================
+export interface ExtraOption {
+  id: string;
+  nombre: string;
+  precio: number;
+}
+
+export interface ExtraCategory {
+  titulo: string;
+  opciones: ExtraOption[];
+}
+
+export interface MenuItem {
+  id: number;
+  nombre: string;
+  descripcion: string;
+  precioBase: number;
+  imagen: string;
+  aplicaExtras: boolean;
+}
+
+export interface MenuCategory {
+  id: string;
+  nombre: string;
+  productos: MenuItem[];
+}
+
+export interface SelectedExtra {
+  categoria: string;
+  opcion: ExtraOption;
+}
+
+export interface CartItem {
+  idUnico: string;
+  producto: MenuItem;
+  extras: SelectedExtra[];
+  precioTotalUnitario: number;
+  cantidad: number;
+  notas: string;
+}
+
+export type TipoEntrega = 'restaurante' | 'llevar' | null;
+
+// ==========================================
+// 2. CONFIGURACIÓN DE EXTRAS Y MENÚ
+// ==========================================
+export const EXTRAS_CAFETERIA: ExtraCategory[] = [
+  {
+    titulo: "Tipo de Leche",
+    opciones: [
+      { id: "leche-entera", nombre: "Entera (Tradicional)", precio: 0 },
+      { id: "leche-deslactosada", nombre: "Deslactosada", precio: 0 },
+      { id: "leche-almendra", nombre: "Almendra", precio: 12 },
+      { id: "leche-avena", nombre: "Avena", precio: 15 }
+    ]
+  },
+  {
+    titulo: "Cargas de Espresso",
+    opciones: [
+      { id: "shot-extra", nombre: "Shot Extra de Espresso", precio: 15 },
+      { id: "descafeinado", nombre: "Cambiar a Descafeinado", precio: 0 }
+    ]
+  },
+  {
+    titulo: "Jarabes y Sabores",
+    opciones: [
+      { id: "jarabe-vainilla", nombre: "Jarabe de Vainilla", precio: 10 },
+      { id: "jarabe-caramelo", nombre: "Jarabe de Caramelo", precio: 10 },
+      { id: "jarabe-avellana", nombre: "Jarabe de Avellana", precio: 10 }
+    ]
+  }
+];
+
+export const MENU_PROTOTIPO: MenuCategory[] = [
+  {
+    id: "cafes-calientes",
+    nombre: "Cafés Calientes",
+    productos: [
+      { id: 101, nombre: "Espresso Italiano", descripcion: "Extracción corta de café concentrado con crema densa.", precioBase: 35, imagen: "https://images.unsplash.com/photo-1510591509098-f4fdc6d0ff04?auto=format&fit=crop&w=400&q=80", aplicaExtras: true },
+      { id: 102, nombre: "Americano", descripcion: "Espresso diluido en agua caliente con tueste medio.", precioBase: 40, imagen: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=400&q=80", aplicaExtras: true },
+      { id: 103, nombre: "Cappuccino Tradicional", descripcion: "Espresso, leche vaporizada y abundante espuma de leche.", precioBase: 55, imagen: "https://images.unsplash.com/photo-1572442388796-11668a67e53d?auto=format&fit=crop&w=400&q=80", aplicaExtras: true },
+      { id: 104, nombre: "Café Latte", descripcion: "Espresso con abundante leche al vapor y capa fina de espuma.", precioBase: 58, imagen: "https://images.unsplash.com/photo-1561882468-9110e03e0f78?auto=format&fit=crop&w=400&q=80", aplicaExtras: true },
+      { id: 105, nombre: "Mochaccino", descripcion: "Espresso con chocolate artesanal, leche al vapor y crema batida.", precioBase: 65, imagen: "https://images.unsplash.com/photo-1578314675249-a6910f80cc4e?auto=format&fit=crop&w=400&q=80", aplicaExtras: true },
+      { id: 106, nombre: "Flat White", descripcion: "Doble carga de espresso con leche micro-vaporizada.", precioBase: 60, imagen: "https://images.unsplash.com/photo-1577968897966-3d4325b36b61?auto=format&fit=crop&w=400&q=80", aplicaExtras: true }
+    ]
+  },
+  {
+    id: "bebidas-frias",
+    nombre: "Bebidas Frías y Frappés",
+    productos: [
+      { id: 201, nombre: "Iced Latte Vanilla", descripcion: "Espresso con leche fría, jarabe de vainilla y hielo.", precioBase: 62, imagen: "https://images.unsplash.com/photo-1517701604599-bb29b565090c?auto=format&fit=crop&w=400&q=80", aplicaExtras: true },
+      { id: 202, nombre: "Frappé Mocha Oreo", descripcion: "Base de café helado batido con galleta Oreo y crema batida.", precioBase: 75, imagen: "https://images.unsplash.com/photo-1572490122747-3968b75cc699?auto=format&fit=crop&w=400&q=80", aplicaExtras: true },
+      { id: 203, nombre: "Cold Brew Artesanal", descripcion: "Café macerado en frío durante 16 horas, suave y poco ácido.", precioBase: 50, imagen: "https://images.unsplash.com/photo-1517701604599-bb29b565090c?auto=format&fit=crop&w=400&q=80", aplicaExtras: true },
+      { id: 204, nombre: "Matcha Iced Latte", descripcion: "Té matcha orgánico batido con leche fría y hielo.", precioBase: 70, imagen: "https://images.unsplash.com/photo-1536256263959-770b48d82b0a?auto=format&fit=crop&w=400&q=80", aplicaExtras: true },
+      { id: 205, nombre: "Frappé Caramel Crunch", descripcion: "Café helado con jarabe de caramelo y trozos de toffee.", precioBase: 75, imagen: "https://images.unsplash.com/photo-1623065422902-30a2d299bbe4?auto=format&fit=crop&w=400&q=80", aplicaExtras: true },
+      { id: 206, nombre: "Té Helado Durazno", descripcion: "Infusión de té negro con toque natural de durazno.", precioBase: 45, imagen: "https://images.unsplash.com/photo-1556679343-c7306c1976bc?auto=format&fit=crop&w=400&q=80", aplicaExtras: false }
+    ]
+  },
+  {
+    id: "panaderia-reposteria",
+    nombre: "Panadería y Repostería",
+    productos: [
+      { id: 301, nombre: "Croissant de Mantequilla", descripcion: "Pan hojaldrado artesanal horneado diariamente.", precioBase: 38, imagen: "https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=400&q=80", aplicaExtras: false },
+      { id: 302, nombre: "Chocolatín (Pain au Chocolat)", descripcion: "Hojaldre relleno de dos barras de chocolate oscuro.", precioBase: 42, imagen: "https://images.unsplash.com/photo-1608198093002-ad4e005484ec?auto=format&fit=crop&w=400&q=80", aplicaExtras: false },
+      { id: 303, nombre: "Rebanada Pastel Red Velvet", descripcion: "Pastel suave de cacao con cobertura de queso crema.", precioBase: 68, imagen: "https://images.unsplash.com/photo-1586788680404-3282482837d3?auto=format&fit=crop&w=400&q=80", aplicaExtras: false },
+      { id: 304, nombre: "Cheesecake de Frutos Rojos", descripcion: "Tarta de queso estilo Nueva York con mermelada casera.", precioBase: 72, imagen: "https://images.unsplash.com/photo-1533134242443-d4fd215305ad?auto=format&fit=crop&w=400&q=80", aplicaExtras: false },
+      { id: 305, nombre: "Muffin de Chispas de Chocolate", descripcion: "Panecillo esponjoso repleto de trozos de chocolate.", precioBase: 35, imagen: "https://images.unsplash.com/photo-1607958996333-41aef7caefaa?auto=format&fit=crop&w=400&q=80", aplicaExtras: false },
+      { id: 306, nombre: "Cinnamon Roll", descripcion: "Rollo de canela tibio con glaseado de vainilla.", precioBase: 48, imagen: "https://images.unsplash.com/photo-1509365465985-25d11c17e812?auto=format&fit=crop&w=400&q=80", aplicaExtras: false }
+    ]
+  },
+  {
+    id: "sandwiches-salados",
+    nombre: "Sandwiches y Salados",
+    productos: [
+      { id: 401, nombre: "Panini Jamón Serrano y Gouda", descripcion: "Pan ciabatta con jamón serrano, queso gouda y pesto.", precioBase: 95, imagen: "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=400&q=80", aplicaExtras: false },
+      { id: 402, nombre: "Bagel de Salmón Ahumado", descripcion: "Con queso crema, alcaparras y cebolla morada.", precioBase: 115, imagen: "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=400&q=80", aplicaExtras: false },
+      { id: 403, nombre: "Croissant Caprese", descripcion: "Relleno de jitomate, queso mozzarella fresco y albahaca.", precioBase: 85, imagen: "https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=400&q=80", aplicaExtras: false },
+      { id: 404, nombre: "Club Sandwich Tradicional", descripcion: "Pollo, tocino, queso, lechuga, jitomate y mayonesa.", precioBase: 105, imagen: "https://images.unsplash.com/photo-1567234669003-dce7a7a88821?auto=format&fit=crop&w=400&q=80", aplicaExtras: false },
+      { id: 405, nombre: "Sándwich de Pollo al Chipotle", descripcion: "Pechuga deshebrada con aderezo casero de chipotle.", precioBase: 88, imagen: "https://images.unsplash.com/photo-1481070414801-51fd732d7184?auto=format&fit=crop&w=400&q=80", aplicaExtras: false }
+    ]
+  },
+  {
+    id: "desayunos-brunch",
+    nombre: "Desayunos y Brunch",
+    productos: [
+      { id: 501, nombre: "Avocado Toast con Huevo", descripcion: "Pan de masa madre con aguacate machacado y huevo pochado.", precioBase: 92, imagen: "https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&w=400&q=80", aplicaExtras: false },
+      { id: 502, nombre: "Bowl de Acai y Fruta", descripcion: "Base de acai con plátano, fresas, granola y miel.", precioBase: 88, imagen: "https://images.unsplash.com/photo-1590301157890-4810ed352733?auto=format&fit=crop&w=400&q=80", aplicaExtras: false },
+      { id: 503, nombre: "Pancakes de Arándanos", descripcion: "Tres pancakes esponjosos servidos con jarabe de arce.", precioBase: 80, imagen: "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?auto=format&fit=crop&w=400&q=80", aplicaExtras: false },
+      { id: 504, nombre: "Chilaquiles Verdes o Rojos", descripcion: "Con crema, queso fresco, cebolla y proteína a elegir.", precioBase: 98, imagen: "https://images.unsplash.com/photo-1615870216519-2f9fa575fa5c?auto=format&fit=crop&w=400&q=80", aplicaExtras: false },
+      { id: 505, nombre: "Waffles con Nieve de Vainilla", descripcion: "Waffles crujientes acompañados de fruta de temporada.", precioBase: 85, imagen: "https://images.unsplash.com/photo-1562376552-0d160a2f238d?auto=format&fit=crop&w=400&q=80", aplicaExtras: false }
+    ]
+  },
+  {
+    id: "metodos-tes",
+    nombre: "Métodos de Extracción y Tés",
+    productos: [
+      { id: 601, nombre: "Método V60 / Chemex", descripcion: "Extracción filtrada que resalta notas florales y frutales.", precioBase: 65, imagen: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=400&q=80", aplicaExtras: false },
+      { id: 602, nombre: "Prensa Francesa", descripcion: "Café de cuerpo completo e intensidad pronunciada.", precioBase: 55, imagen: "https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=400&q=80", aplicaExtras: false },
+      { id: 603, nombre: "Chai Tea Latte", descripcion: "Té negro especiado con leche vaporizada y canela.", precioBase: 62, imagen: "https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=400&q=80", aplicaExtras: true },
+      { id: 604, nombre: "Infusión Manzanilla y Menta", descripcion: "Mezcla de hierbas naturales sin cafeína.", precioBase: 40, imagen: "https://images.unsplash.com/photo-1597481499750-3e6b22637e12?auto=format&fit=crop&w=400&q=80", aplicaExtras: false },
+      { id: 605, nombre: "Té Verde Sencha", descripcion: "Té verde japonés de perfil herbal y fresco.", precioBase: 42, imagen: "https://images.unsplash.com/photo-1627435601361-ec25f5b1d0e5?auto=format&fit=crop&w=400&q=80", aplicaExtras: false }
+    ]
+  }
+];
+
+const LISTA_CATEGORIAS = [
+  { id: "todos", nombre: "Todos" },
+  ...MENU_PROTOTIPO.map(cat => ({ id: cat.id, nombre: cat.nombre }))
+];
+
+const LOCAL_STORAGE_KEY = 'cafe_velvet_carrito_v1';
+
+// ==========================================
+// 3. COMPONENTE PRINCIPAL
+// ==========================================
 export default function App() {
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [categoriaActiva, setCategoriaActiva] = useState<string>("todos");
+  const [productoSeleccionado, setProductoSeleccionado] = useState<MenuItem | null>(null);
+  const [extrasSeleccionados, setExtrasSeleccionados] = useState<Record<string, ExtraOption>>({});
+  const [notas, setNotas] = useState<string>('');
+  const [mostrarCarrito, setMostrarCarrito] = useState<boolean>(false);
 
-  const handleScroll = (direction: 'left' | 'right') => {
-    if (scrollContainerRef.current) {
-      const scrollAmount = window.innerWidth * 0.75; // Desplaza el 75% del ancho de pantalla
-      scrollContainerRef.current.scrollBy({
-        left: direction === 'left' ? -scrollAmount : scrollAmount,
-        behavior: 'smooth'
-      });
+  // Estados para datos obligatorios de la orden
+  const [tipoEntrega, setTipoEntrega] = useState<TipoEntrega>(null);
+  const [nombreCliente, setNombreCliente] = useState<string>('');
+  const [erroresFormulario, setErroresFormulario] = useState<{ entrega?: boolean; nombre?: boolean }>({});
+
+  // Inicializar estado del Carrito desde LocalStorage
+  const [carrito, setCarrito] = useState<CartItem[]>(() => {
+    if (typeof window !== 'undefined') {
+      const datosGuardados = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (datosGuardados) {
+        try {
+          return JSON.parse(datosGuardados);
+        } catch (e) {
+          console.error("Error al parsear el carrito de localStorage", e);
+        }
+      }
     }
-    };
-  const serviciosCorte = [
-    { nombre: 'Corte Dama', descripcion: 'Incluye lavado y estilizado', precio: '$200' },
-    { nombre: 'Corte Caballero', descripcion: 'Incluye lavado, afeitado con navaja y estilizado', precio: '$140' },
-    { nombre: 'Peinado Social', descripcion: 'Semirecojido, recojido y messy', precio: '$550+' },
-    { nombre: 'Alaseado express', descripcion: '', precio: '$150' },
-    { nombre: 'Ondulado', descripcion: '', precio: '$250' },
-    { nombre: 'Curly permanente', descripcion: 'Incluye base para dama o caballero', precio: '$650+' },
-     { nombre: 'Queratina', descripcion: '', precio: '$1,400+' }
-  ];
+    return [];
+  });
 
-  const serviciosColor = [
-    { nombre: 'Tinte Global', descripcion: 'Tono uniforme con shot de proteina', precio: '$900+' },
-    { nombre: 'Retoque de Raíz', descripcion: 'Cobertura de cana / crecimiento de 1 a 2 cm', precio: '$500' },
-    { nombre: 'Balayage / Mechas / babylights / highlights', descripcion: 'Diseño personalizado de iluminación', precio: '$1,900+' },
-    { nombre: 'Matiz, glosing y shot de hidratacion', descripcion: 'Refresco de tono e hidratación', precio: '$800+' }
-  ];
-  const maquillajeProfesional = [
-    { nombre: 'Maquillaje social', descripcion: 'Incluye peinado sencillo y pestañas postizas', precio: '$1,500' },
-    { nombre: 'Maquillaje 15 años', descripcion: 'Incluye peinado, skincare y pestañas postizas, (no incluye prueba de maquillaje)', precio: '$2,100' },
-    { nombre: 'Paquete de 15 años', descripcion: 'Incluye peinado, skincare, pestañas postizas y prueba de maquillaje', precio: '$4,000' },
-    { nombre: 'Maquillaje de novia', descripcion: 'Incluye peinado sencillo o con estructura, skincare, exfoliación facial, parches para ojos, pestañas postizas y kit de regalo, (no incluye prieba de maquillaje)', precio: '$2,950' },
-    { nombre: 'Paquete de novia', descripcion: 'Incluye Asesoramiento previo al evento, peinado sencillo o con estructura, skincare, parches, exfoliación facial, pestañas postizas, diseño de ceja, maquillaje correctivo, maquillaje de escote, kit de regalo y prueba de maquillaje', precio: '$5,500' }
-  ];
+  // Guardar en LocalStorage cada vez que cambie el carrito
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(carrito));
+  }, [carrito]);
+
+  // Obtener Categorías a mostrar
+  const categoriasAMostrar = categoriaActiva === "todos"
+    ? MENU_PROTOTIPO
+    : MENU_PROTOTIPO.filter(cat => cat.id === categoriaActiva);
+
+  // Abrir Modal de Producto
+  const abrirModal = (producto: MenuItem) => {
+    setProductoSeleccionado(producto);
+    setExtrasSeleccionados({});
+    setNotas('');
+  };
+
+  // Manejar Selección de Extras
+  const toggleExtra = (tituloCategoria: string, opcion: ExtraOption) => {
+    setExtrasSeleccionados(prev => {
+      const nuevoState = { ...prev };
+      if (nuevoState[tituloCategoria]?.id === opcion.id) {
+        delete nuevoState[tituloCategoria];
+      } else {
+        nuevoState[tituloCategoria] = opcion;
+      }
+      return nuevoState;
+    });
+  };
+
+  // Calcular Precio Total Unitario
+  const calcularPrecioModal = (): number => {
+    if (!productoSeleccionado) return 0;
+    const precioExtras = Object.values(extrasSeleccionados).reduce((sum, item) => sum + item.precio, 0);
+    return productoSeleccionado.precioBase + precioExtras;
+  };
+
+  // Agregar al Carrito
+  const agregarAlCarrito = () => {
+    if (!productoSeleccionado) return;
+
+    const extrasArray: SelectedExtra[] = Object.entries(extrasSeleccionados).map(([cat, opc]) => ({
+      categoria: cat,
+      opcion: opc
+    }));
+
+    const nuevoItem: CartItem = {
+      idUnico: `${productoSeleccionado.id}-${Date.now()}`,
+      producto: productoSeleccionado,
+      extras: extrasArray,
+      precioTotalUnitario: calcularPrecioModal(),
+      cantidad: 1,
+      notas: notas
+    };
+
+    setCarrito(prev => [...prev, nuevoItem]);
+    setProductoSeleccionado(null);
+  };
+
+  // Eliminar Artículo del Carrito
+  const eliminarDelCarrito = (idUnico: string) => {
+    setCarrito(prev => prev.filter(item => item.idUnico !== idUnico));
+  };
+
+  // Vaciar Carrito y Formulario
+  const vaciarCarrito = () => {
+    setCarrito([]);
+    setTipoEntrega(null);
+    setNombreCliente('');
+    setErroresFormulario({});
+  };
+
+  // Totales
+  const totalItems = carrito.reduce((sum, item) => sum + item.cantidad, 0);
+  const granTotal = carrito.reduce((sum, item) => sum + (item.precioTotalUnitario * item.cantidad), 0);
+
+  // Seleccionar Tipo de Entrega
+  const handleSeleccionarEntrega = (tipo: TipoEntrega) => {
+    setTipoEntrega(tipo);
+    setErroresFormulario(prev => ({ ...prev, entrega: false }));
+  };
+
+  // Enviar a WhatsApp con validación obligatoria y limpieza posterior
+  const enviarWhatsApp = () => {
+    const hayErrorEntrega = !tipoEntrega;
+    const hayErrorNombre = !nombreCliente.trim();
+
+    if (hayErrorEntrega || hayErrorNombre) {
+      setErroresFormulario({
+        entrega: hayErrorEntrega,
+        nombre: hayErrorNombre
+      });
+      return;
+    }
+
+    const telefono = "522201404854"; // Reemplazar por el número de WhatsApp receptor
+    const textoEntrega = tipoEntrega === 'restaurante' ? '🍽️ EN RESTAURANTE' : '🥡 PARA LLEVAR';
+    
+    let mensaje = `¡Hola! Quisiera realizar el siguiente pedido:\n`;
+    mensaje += `*Cliente:* ${nombreCliente.trim()}\n`;
+    mensaje += `*Modalidad:* ${textoEntrega}\n\n`;
+
+    carrito.forEach((item, index) => {
+      mensaje += `*${index + 1}. ${item.producto.nombre}* - $${item.precioTotalUnitario}\n`;
+      if (item.extras.length > 0) {
+        item.extras.forEach(ext => {
+          mensaje += `   • ${ext.categoria}: ${ext.opcion.nombre} ${ext.opcion.precio > 0 ? `(+$${ext.opcion.precio})` : ''}\n`;
+        });
+      }
+      if (item.notas) {
+        mensaje += `   • Nota: ${item.notas}\n`;
+      }
+      mensaje += `\n`;
+    });
+
+    mensaje += `*TOTAL A PAGAR: $${granTotal} MXN*`;
+
+    const url = `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
+    
+    // Abrir ventana de WhatsApp
+    window.open(url, '_blank');
+
+    // Vaciar carrito y reiniciar formulario
+    vaciarCarrito();
+    setMostrarCarrito(false);
+  };
 
   return (
-    <div className="bg-[#121212] text-gray-200 min-h-screen font-sans selection:bg-[#D4AF37] selection:text-black">
-      
-      {/* Botón Flotante de WhatsApp */}
-      <a
-        href="https://wa.me/525521945420?text=Hola,%20me%20gustaría%20agendar%20una%20cita%20en%20Velvet%20Room%20Hair"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="fixed bottom-6 right-6 bg-green-500 hover:bg-green-600 text-white p-4 rounded-full shadow-2xl transition-all duration-300 hover:scale-110 z-50 flex items-center justify-center border border-green-400/30"
-        aria-label="Contactar por WhatsApp"
-      >
-        <MessageCircle className="w-7 h-7 fill-current" />
-      </a>
-
-      {/* Navegación */}
-      <nav className="fixed top-0 left-0 w-full bg-[#0D0D0D]/90 backdrop-blur-md border-b border-[#D4AF37]/20 z-40">
-        <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="text-xl font-bold tracking-widest text-white uppercase">
-           <img src="/LogoVelvetRoomHair.jpeg" alt="" className="h-10 md:h-18 w-auto object-contain transition-all duration-300"/>
+    <div className="min-h-screen bg-neutral-50 text-neutral-800 pb-24 font-sans">
+      {/* HEADER */}
+      <header className="sticky top-0 z-10 bg-white shadow-sm border-b border-neutral-200">
+        <div className="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Coffee className="w-6 h-6 text-amber-600" />
+            <h1 className="font-bold text-lg text-neutral-900">Café Velvet Demo</h1>
           </div>
-          <div className="flex gap-6 text-sm uppercase tracking-wider">
-            <a href="#servicios" className="hover:text-[#D4AF37] transition-colors">Precios</a>
-            <a href="#ubicacion" className="hover:text-[#D4AF37] transition-colors">Ubicación</a>
-          </div>
-        </div>
-      </nav>
-
-      {/* Hero Section */}
-      {/* Hero Section */}
-      <section className="relative pt-36 pb-24 px-6 border-b border-[#D4AF37]/10 flex items-center min-h-[500px]">
-        {/* Imagen de fondo con capa oscura (Overlay) */}
-        <div className="absolute inset-0 z-0">
-          <img
-            src="https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=1600&auto=format&fit=crop"
-            alt="Fondo Velvet Room"
-            className="w-full h-full object-cover object-center"
-          />
-          {/* Overlay oscuro para darle el tono luxury y legibilidad */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0A0A0A] via-[#0A0A0A]/90 to-[#0A0A0A]/70" />
+          <button 
+            onClick={() => setMostrarCarrito(true)}
+            className="relative p-2 bg-amber-50 text-amber-700 rounded-full hover:bg-amber-100 transition-colors"
+          >
+            <ShoppingBag className="w-5 h-5" />
+            {totalItems > 0 && (
+              <span className="absolute -top-1 -right-1 bg-amber-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                {totalItems}
+              </span>
+            )}
+          </button>
         </div>
 
-        {/* Contenido alineado en Flex/Grid */}
-        <div className="relative z-10 max-w-6xl mx-auto w-full flex flex-col md:flex-row md:items-center md:justify-between gap-8">
-          
-          {/* Lado Izquierdo: Texto */}
-          <div className="text-left md:max-w-xl">
-            <h1 className="text-5xl md:text-7xl font-serif text-white tracking-wider mb-1">
-              VELVET
-            </h1>
-            <p className="text-lg md:text-xl text-[#D4AF37] tracking-[0.3em] uppercase mb-4 font-medium">
-              Room Hair
-            </p>
-            <p className="text-gray-300 text-base md:text-lg leading-relaxed">
-              Estudio especializado en diseño de imagen, colorimetría de alta precisión y cuidado capilar profesional.
-            </p>
-          </div>
-
-          {/* Lado Derecho: Botones */}
-          <div className="flex flex-col sm:flex-row md:flex-col gap-4 shrink-0 md:min-w-[220px]">
-            <a
-              href="https://wa.me/525521945420?text=Hola,%20quisiera%20agendar%20una%20cita"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bg-[#D4AF37] text-black hover:bg-[#B8952E] font-semibold px-8 py-4 rounded-sm uppercase tracking-widest text-xs transition-all duration-300 shadow-lg shadow-[#D4AF37]/10 text-center"
-            >
-              Agendar Cita
-            </a>
-            <a
-              href="#servicios"
-              className="border border-[#D4AF37]/50 text-[#D4AF37] hover:bg-[#D4AF37]/10 backdrop-blur-sm font-semibold px-8 py-4 rounded-sm uppercase tracking-widest text-xs transition-all duration-300 text-center"
-            >
-              Ver Catálogo
-            </a>
-          </div>
-
-        </div>
-      </section>
-
-   
-     {/* Catálogo de Precios */}
-      <section id="servicios" className="py-20 px-6 bg-[#0A0A0A]">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-serif text-[#D4AF37] mb-3">
-              Catálogo de Servicios
-            </h2>
-            <div className="h-0.5 w-16 bg-[#D4AF37] mx-auto mb-4"></div>
-            <p className="text-gray-400 text-sm">Precios sujetos a evaluación y largo de cabello</p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {/* Categoría 1: Corte & Estilismo */}
-            <div className="bg-[#151515] p-8 rounded-sm border border-[#D4AF37]/20 shadow-xl transition-all duration-300 hover:border-[#D4AF37] hover:shadow-[0_0_25px_rgba(212,175,55,0.25)] hover:-translate-y-1">
-              <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-800">
-                <Scissors className="text-[#D4AF37] w-6 h-6" />
-                <h3 className="text-xl font-serif text-white">Corte & Estilismo</h3>
-              </div>
-              <div className="space-y-6">
-                {serviciosCorte.map((item, index) => (
-                  <div key={index} className="flex justify-between items-start border-b border-gray-800/60 pb-3">
-                    <div>
-                      <h4 className="text-white font-medium text-base">{item.nombre}</h4>
-                      <p className="text-gray-500 text-xs mt-0.5">{item.descripcion}</p>
-                    </div>
-                    <span className="text-[#D4AF37] font-semibold text-lg">{item.precio}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Categoría 2: Colorimetría & Diseño */}
-            <div className="bg-[#151515] p-8 rounded-sm border border-[#D4AF37]/20 shadow-xl transition-all duration-300 hover:border-[#D4AF37] hover:shadow-[0_0_25px_rgba(212,175,55,0.25)] hover:-translate-y-1">
-              <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-800">
-                <Sparkles className="text-[#D4AF37] w-6 h-6" />
-                <h3 className="text-xl font-serif text-white">Colorimetría & Diseño</h3>
-              </div>
-              <div className="space-y-6">
-                {serviciosColor.map((item, index) => (
-                  <div key={index} className="flex justify-between items-start border-b border-gray-800/60 pb-3">
-                    <div>
-                      <h4 className="text-white font-medium text-base">{item.nombre}</h4>
-                      <p className="text-gray-500 text-xs mt-0.5 ">{item.descripcion}</p>
-                    </div>
-                    <span className="text-[#D4AF37] font-semibold text-lg">{item.precio}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Categoría 3: Maquillaje profesional */}
-            <div className="bg-[#151515] p-8 rounded-sm border border-[#D4AF37]/20 shadow-xl transition-all duration-300 hover:border-[#D4AF37] hover:shadow-[0_0_25px_rgba(212,175,55,0.25)] hover:-translate-y-1">
-              <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-800">
-                <Sparkles className="text-[#D4AF37] w-6 h-6" />
-                <h3 className="text-xl font-serif text-white">Maquillaje profesional</h3>
-              </div>
-              <div className="space-y-6">
-                {maquillajeProfesional.map((item, index) => (
-                  <div key={index} className="flex justify-between items-start border-b border-gray-800/60 pb-3">
-                    <div>
-                      <h4 className="text-white font-medium text-base">{item.nombre}</h4>
-                      <p className="text-gray-500 text-xs mt-0.5">{item.descripcion}</p>
-                    </div>
-                    <span className="text-[#D4AF37] font-semibold text-lg">{item.precio}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-{/* Galería de Fotos */}
-      <section id="galeria" className="py-20 px-6 bg-[#121212] border-t border-[#D4AF37]/10 relative">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-serif text-[#D4AF37] mb-3">
-              Nuestras instalaciones.
-            </h2>
-            <div className="h-0.5 w-16 bg-[#D4AF37] mx-auto mb-4"></div>
-            <p className="text-gray-400 text-sm">
-              Diseños de imagen, cortes y colorimetría realizados en nuestro salón
-            </p>
-          </div>
-
-          {/* Contenedor relativo para posicionar las flechas en Mobile */}
-          <div className="relative group">
-            
-            {/* Flecha Izquierda (solo Mobile) */}
+        {/* NAVEGACIÓN DE CATEGORÍAS */}
+        <div className="flex overflow-x-auto gap-2 px-4 py-2 scrollbar-hide border-t border-neutral-100 max-w-md mx-auto">
+          {LISTA_CATEGORIAS.map(cat => (
             <button
-              onClick={() => handleScroll('left')}
-              className="md:hidden absolute left-1 top-1/2 -translate-y-1/2 z-20 bg-[#0A0A0A]/80 border border-[#D4AF37]/40 text-[#D4AF37] p-2 rounded-full backdrop-blur-sm active:scale-95 transition-transform"
-              aria-label="Anterior"
+              key={cat.id}
+              onClick={() => setCategoriaActiva(cat.id)}
+              className={`whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                categoriaActiva === cat.id 
+                  ? 'bg-amber-600 text-white' 
+                  : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+              }`}
             >
-              <ChevronLeft className="w-5 h-5" />
+              {cat.nombre}
             </button>
-
-            {/* Flecha Derecha (solo Mobile) */}
-            <button
-              onClick={() => handleScroll('right')}
-              className="md:hidden absolute right-1 top-1/2 -translate-y-1/2 z-20 bg-[#0A0A0A]/80 border border-[#D4AF37]/40 text-[#D4AF37] p-2 rounded-full backdrop-blur-sm active:scale-95 transition-transform"
-              aria-label="Siguiente"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
-
-            {/* 
-              Contenedor de Imágenes:
-              - Mobile: Oculta scrollbar ([&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]).
-              - PC: Grid de 3 columnas sin botones.
-            */}
-            <div
-              ref={scrollContainerRef}
-              className="flex md:grid md:grid-cols-3 gap-6 overflow-x-auto md:overflow-visible snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
-            >
-              
-              {/* Foto 1 */}
-              <div className="snap-center shrink-0 w-[85vw] sm:w-[60vw] md:w-auto relative group/item overflow-hidden rounded-sm border border-[#D4AF37]/20 bg-[#1A1A1A]">
-                <img
-                  src="https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?q=80&w=800&auto=format&fit=crop"
-                  alt="Balayage y Colorimetría"
-                  className="w-full h-80 object-cover transition-transform duration-500 group-hover/item:scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover/item:opacity-100 transition-opacity duration-300 flex items-end p-6">
-                  <span className="text-[#D4AF37] text-sm font-serif tracking-wider uppercase">
-                    Balayage & Iluminación
-                  </span>
-                </div>
-              </div>
-
-              {/* Foto 2 */}
-              <div className="snap-center shrink-0 w-[85vw] sm:w-[60vw] md:w-auto relative group/item overflow-hidden rounded-sm border border-[#D4AF37]/20 bg-[#1A1A1A]">
-                <img
-                  src="https://images.unsplash.com/photo-1562322140-8baeececf3df?q=80&w=800&auto=format&fit=crop"
-                  alt="Corte y Peinado Dama"
-                  className="w-full h-80 object-cover transition-transform duration-500 group-hover/item:scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover/item:opacity-100 transition-opacity duration-300 flex items-end p-6">
-                  <span className="text-[#D4AF37] text-sm font-serif tracking-wider uppercase">
-                    Corte & Estilismo
-                  </span>
-                </div>
-              </div>
-
-              {/* Foto 3 */}
-              <div className="snap-center shrink-0 w-[85vw] sm:w-[60vw] md:w-auto relative group/item overflow-hidden rounded-sm border border-[#D4AF37]/20 bg-[#1A1A1A]">
-                <img
-                  src="https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?q=80&w=800&auto=format&fit=crop"
-                  alt="Tratamiento Capilar"
-                  className="w-full h-80 object-cover transition-transform duration-500 group-hover/item:scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover/item:opacity-100 transition-opacity duration-300 flex items-end p-6">
-                  <span className="text-[#D4AF37] text-sm font-serif tracking-wider uppercase">
-                    Cuidado Capilar
-                  </span>
-                </div>
-              </div>
-
-              {/* Foto 4 */}
-              <div className="snap-center shrink-0 w-[85vw] sm:w-[60vw] md:w-auto relative group/item overflow-hidden rounded-sm border border-[#D4AF37]/20 bg-[#1A1A1A]">
-                <img
-                  src="https://images.unsplash.com/photo-1605497788044-5a32c7078486?q=80&w=800&auto=format&fit=crop"
-                  alt="Corte Caballero"
-                  className="w-full h-80 object-cover transition-transform duration-500 group-hover/item:scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover/item:opacity-100 transition-opacity duration-300 flex items-end p-6">
-                  <span className="text-[#D4AF37] text-sm font-serif tracking-wider uppercase">
-                    Diseño Masculino
-                  </span>
-                </div>
-              </div>
-
-              {/* Foto 5 */}
-              <div className="snap-center shrink-0 w-[85vw] sm:w-[60vw] md:w-auto relative group/item overflow-hidden rounded-sm border border-[#D4AF37]/20 bg-[#1A1A1A]">
-                <img
-                  src="https://images.unsplash.com/photo-1519699047748-de8e457a634e?q=80&w=800&auto=format&fit=crop"
-                  alt="Peinado Social"
-                  className="w-full h-80 object-cover transition-transform duration-500 group-hover/item:scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover/item:opacity-100 transition-opacity duration-300 flex items-end p-6">
-                  <span className="text-[#D4AF37] text-sm font-serif tracking-wider uppercase">
-                    Peinado Social
-                  </span>
-                </div>
-              </div>
-
-              {/* Foto 6 */}
-              <div className="snap-center shrink-0 w-[85vw] sm:w-[60vw] md:w-auto relative group/item overflow-hidden rounded-sm border border-[#D4AF37]/20 bg-[#1A1A1A]">
-                <img
-                  src="https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?q=80&w=800&auto=format&fit=crop"
-                  alt="Tratamiento Capilar"
-                  className="w-full h-80 object-cover transition-transform duration-500 group-hover/item:scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover/item:opacity-100 transition-opacity duration-300 flex items-end p-6">
-                  <span className="text-[#D4AF37] text-sm font-serif tracking-wider uppercase">
-                    Cuidado Capilar
-                  </span>
-                </div>
-              </div>
-
-              
-
-            </div>
-          </div>
+          ))}
         </div>
-      </section>
+      </header>
 
-      {/* Ubicación y Mapa */}
-      <section id="ubicacion" className="py-20 px-6 bg-[#121212]">
-        <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-12 items-center">
-          <div>
-            <h2 className="text-3xl font-serif text-white mb-2">Ubicación y Contacto</h2>
-            <p className="text-[#D4AF37] uppercase tracking-widest text-xs mb-8">Visítanos en nuestra sucursal</p>
-
-            <div className="space-y-6 text-gray-300">
-              <div className="flex items-start gap-4">
-                <MapPin className="text-[#D4AF37] w-6 h-6 shrink-0 mt-1" />
-                <div>
-                  <strong className="text-white block font-medium">Dirección:</strong>
-                  <span>C. Agricultura Nte. 4a, San Cristóbal Centro, Ecatepec de Morelos, Méx.</span>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4">
-                <Clock className="text-[#D4AF37] w-6 h-6 shrink-0 mt-1" />
-                <div>
-                  <strong className="text-white block font-medium">Horarios de Atención:</strong>
-                  <span>Lunes a Viernes: 11:00 am – 8:00 pm</span><br />
-                  <span>Sábados: 10:00 am – 3:30 pm</span><br />
-                  <span className="text-gray-500 text-xs">Un dia de descnaso a la semana, previa cita</span>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4">
-                <Phone className="text-[#D4AF37] w-6 h-6 shrink-0 mt-1" />
-                <div>
-                  <strong className="text-white block font-medium">Teléfono / WhatsApp:</strong>
-                  <a href="tel:525521945420" className="hover:text-[#D4AF37] transition-colors">+52 55 2194 5420</a>
-                </div>
-              </div>
-            </div>
-
-            {/* Redes Sociales */}
-            <div className="mt-8 pt-6 border-t border-gray-800 flex items-center gap-4">
-              <span className="text-md text-gray-400">Síguenos:</span>
-              {/* Botón de Instagram */}
-              <a
-                  href="https://www.instagram.com/rojogram_?utm_source=qr"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Instagram"
-                  className="text-gray-300 hover:text-[#D4AF37] p-2 rounded-full hover:bg-[#D4AF37]/10 transition-colors duration-300 flex items-center justify-center"
+      {/* LISTA DE PRODUCTOS */}
+      <main className="max-w-md mx-auto px-4 mt-4 space-y-6">
+        {categoriasAMostrar.map(cat => (
+          <div key={cat.id} className="space-y-3">
+            <h2 className="text-lg font-bold text-neutral-900 border-b border-neutral-200 pb-1">{cat.nombre}</h2>
+            <div className="grid grid-cols-1 gap-3">
+              {cat.productos.map(prod => (
+                <div 
+                  key={prod.id} 
+                  onClick={() => abrirModal(prod)}
+                  className="flex bg-white rounded-xl overflow-hidden border border-neutral-200 shadow-sm hover:border-amber-400 transition-all cursor-pointer"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="w-8 h-8 md:w-9 md:h-9" 
-                  >
-                    <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
-                    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
-                    <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
-                  </svg>
-                </a>
+                  <img 
+                    src={prod.imagen} 
+                    alt={prod.nombre} 
+                    className="w-24 h-24 object-cover flex-shrink-0"
+                  />
+                  <div className="p-3 flex flex-col justify-between flex-grow">
+                    <div>
+                      <h3 className="font-semibold text-neutral-900 text-sm">{prod.nombre}</h3>
+                      <p className="text-xs text-neutral-500 line-clamp-2 mt-0.5">{prod.descripcion}</p>
+                    </div>
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="font-bold text-amber-700 text-sm">${prod.precioBase}</span>
+                      <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded flex items-center gap-1 font-medium">
+                        <Plus className="w-3 h-3" /> Agregar
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
+        ))}
+      </main>
 
-          {/* iFrame Google Maps */}
-          <div className="h-80 md:h-96 rounded-sm border border-[#D4AF37]/30 overflow-hidden shadow-2xl">
-            <iframe 
-              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3758.579154244569!2d-99.05168486254563!3d19.60252259238654!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x85d1f177b07f8875%3A0x77dcd736253dc061!2sVelvet%20Room%20Hair!5e0!3m2!1sen!2smx!4v1786738968960!5m2!1sen!2smx" 
-              width="100%"
-              height="100%"
-              style={{ border: 0 }}
-              allowFullScreen
-              loading="lazy"
-              title="Ubicación Velvet Room Hair"
-            ></iframe>
-            
+      {/* MODAL PERSONALIZACIÓN DE PRODUCTO */}
+      {productoSeleccionado && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center sm:items-center p-0 sm:p-4">
+          <div className="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl max-h-[90vh] overflow-y-auto flex flex-col">
+            <div className="relative">
+              <img 
+                src={productoSeleccionado.imagen} 
+                alt={productoSeleccionado.nombre} 
+                className="w-full h-48 object-cover"
+              />
+              <button 
+                onClick={() => setProductoSeleccionado(null)}
+                className="absolute top-3 right-3 bg-black/60 text-white p-1.5 rounded-full hover:bg-black/80"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 flex-1">
+              <h3 className="text-lg font-bold text-neutral-900">{productoSeleccionado.nombre}</h3>
+              <p className="text-xs text-neutral-500 mt-1">{productoSeleccionado.descripcion}</p>
+
+              {productoSeleccionado.aplicaExtras && (
+                <div className="mt-4 space-y-4">
+                  {EXTRAS_CAFETERIA.map(catExtra => (
+                    <div key={catExtra.titulo} className="border-t border-neutral-100 pt-3">
+                      <h4 className="text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2">
+                        {catExtra.titulo}
+                      </h4>
+                      <div className="space-y-1.5">
+                        {catExtra.opciones.map(opc => {
+                          const estaSeleccionado = extrasSeleccionados[catExtra.titulo]?.id === opc.id;
+                          return (
+                            <button
+                              key={opc.id}
+                              onClick={() => toggleExtra(catExtra.titulo, opc)}
+                              className={`w-full flex items-center justify-between p-2.5 rounded-lg border text-xs transition-all ${
+                                estaSeleccionado 
+                                  ? 'border-amber-600 bg-amber-50 text-amber-900 font-medium' 
+                                  : 'border-neutral-200 hover:border-neutral-300 text-neutral-700'
+                              }`}
+                            >
+                              <span className="flex items-center gap-2">
+                                <span className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                                  estaSeleccionado ? 'border-amber-600 bg-amber-600 text-white' : 'border-neutral-300'
+                                }`}>
+                                  {estaSeleccionado && <Check className="w-3 h-3" />}
+                                </span>
+                                {opc.nombre}
+                              </span>
+                              {opc.precio > 0 && <span className="text-neutral-500">+${opc.precio}</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-4 border-t border-neutral-100 pt-3">
+                <label className="text-xs font-bold text-neutral-700 block mb-1">Notas especiales</label>
+                <input 
+                  type="text" 
+                  value={notas}
+                  onChange={(e) => setNotas(e.target.value)}
+                  placeholder="Ej. Muy caliente, sin azúcar..."
+                  className="w-full text-xs p-2 border border-neutral-200 rounded-lg focus:outline-none focus:border-amber-500"
+                />
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-neutral-100 bg-neutral-50">
+              <button 
+                onClick={agregarAlCarrito}
+                className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-between transition-colors"
+              >
+                <span>Agregar al Pedido</span>
+                <span>${calcularPrecioModal()}</span>
+              </button>
+            </div>
           </div>
         </div>
-      </section>
+      )}
 
-      {/* Pie de página */}
-      <footer className="bg-[#050505] py-8 px-6 text-center text-xs text-gray-600 border-t border-[#D4AF37]/10">
-        <p>© {new Date().getFullYear()} Velvet Room Hair. Todos los derechos reservados.</p>
-      </footer>
+      {/* MODAL CARRITO / PEDIDO */}
+      {mostrarCarrito && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center sm:items-center p-0 sm:p-4">
+          <div className="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl max-h-[90vh] flex flex-col">
+            <div className="p-4 border-b border-neutral-200 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-neutral-900">Tu Pedido</h3>
+                {carrito.length > 0 && (
+                  <button 
+                    onClick={vaciarCarrito}
+                    className="text-[10px] text-red-500 hover:underline font-medium ml-2"
+                  >
+                    Vaciar todo
+                  </button>
+                )}
+              </div>
+              <button onClick={() => setMostrarCarrito(false)} className="text-neutral-400 hover:text-neutral-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto flex-1 space-y-4">
+              {carrito.length > 0 && (
+                <div className="space-y-3 bg-neutral-50 p-3 rounded-xl border border-neutral-200">
+                  {/* NOMBRE DEL CLIENTE (OBLIGATORIO) */}
+                  <div>
+                    <label className="text-xs font-bold text-neutral-800 flex items-center justify-between mb-1">
+                      <span className="flex items-center gap-1.5">
+                        <User className="w-3.5 h-3.5 text-neutral-600" />
+                        Nombre del Cliente
+                      </span>
+                      <span className="text-[10px] text-red-500 uppercase tracking-wider font-semibold">* Requerido</span>
+                    </label>
+                    <input 
+                      type="text"
+                      value={nombreCliente}
+                      onChange={(e) => {
+                        setNombreCliente(e.target.value);
+                        setErroresFormulario(prev => ({ ...prev, nombre: false }));
+                      }}
+                      placeholder="Escribe tu nombre completo..."
+                      className={`w-full text-xs p-2.5 bg-white border rounded-lg focus:outline-none transition-colors ${
+                        erroresFormulario.nombre 
+                          ? 'border-red-500 ring-1 ring-red-500' 
+                          : 'border-neutral-200 focus:border-amber-500'
+                      }`}
+                    />
+                    {erroresFormulario.nombre && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-1">
+                        ⚠️ Por favor escribe tu nombre.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* TIPO DE ENTREGA (OBLIGATORIO) */}
+                  <div className="space-y-1.5 pt-1 border-t border-neutral-200/60">
+                    <label className="text-xs font-bold text-neutral-800 flex items-center justify-between">
+                      <span>¿Cómo lo deseas disfrutar?</span>
+                      <span className="text-[10px] text-red-500 uppercase tracking-wider font-semibold">* Requerido</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-2 pt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => handleSeleccionarEntrega('restaurante')}
+                        className={`flex items-center justify-center gap-2 p-2.5 rounded-lg border text-xs font-medium transition-all ${
+                          tipoEntrega === 'restaurante'
+                            ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+                            : 'bg-white text-neutral-700 border-neutral-200 hover:border-neutral-300'
+                        }`}
+                      >
+                        <Utensils className="w-4 h-4" />
+                        En restaurante
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSeleccionarEntrega('llevar')}
+                        className={`flex items-center justify-center gap-2 p-2.5 rounded-lg border text-xs font-medium transition-all ${
+                          tipoEntrega === 'llevar'
+                            ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+                            : 'bg-white text-neutral-700 border-neutral-200 hover:border-neutral-300'
+                        }`}
+                      >
+                        <BagIcon className="w-4 h-4" />
+                        Para llevar
+                      </button>
+                    </div>
+                    {erroresFormulario.entrega && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-1">
+                        ⚠️ Selecciona si es en restaurante o para llevar.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* LISTA DE ARTÍCULOS */}
+              {carrito.length === 0 ? (
+                <p className="text-center text-xs text-neutral-400 py-8">Tu carrito está vacío.</p>
+              ) : (
+                <div className="space-y-3">
+                  {carrito.map(item => (
+                    <div key={item.idUnico} className="flex items-start justify-between border-b border-neutral-100 pb-3 gap-2">
+                      <div className="flex-1">
+                        <p className="font-medium text-xs text-neutral-900">{item.producto.nombre}</p>
+                        {item.extras.map(e => (
+                          <p key={e.opcion.id} className="text-[10px] text-neutral-500">
+                            + {e.opcion.nombre}
+                          </p>
+                        ))}
+                        {item.notas && <p className="text-[10px] italic text-neutral-400">"{item.notas}"</p>}
+                      </div>
+                      
+                      <div className="flex items-center gap-3">
+                        <span className="font-bold text-xs text-amber-700">${item.precioTotalUnitario}</span>
+                        <button 
+                          onClick={() => eliminarDelCarrito(item.idUnico)}
+                          className="text-neutral-400 hover:text-red-500 p-1 transition-colors"
+                          title="Eliminar producto"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {carrito.length > 0 && (
+              <div className="p-4 border-t border-neutral-200 bg-neutral-50 space-y-3">
+                <div className="flex justify-between items-center text-sm font-bold">
+                  <span>Total</span>
+                  <span className="text-amber-700">${granTotal} MXN</span>
+                </div>
+                <button 
+                  onClick={enviarWhatsApp}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md active:scale-[0.99]"
+                >
+                  Confirmar por WhatsApp
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
